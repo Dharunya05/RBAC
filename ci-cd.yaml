@@ -1,0 +1,40 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Docker Image
+      run: docker build -t myapp/nginx:latest .
+
+    - name: Trivy Scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'myapp/nginx:latest'
+
+    - name: Validate YAML (kubeval)
+      run: |
+        curl -sL https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
+        ./kubeval *.yaml
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+
+    - name: Deploy to Minikube
+      run: |
+        kubectl apply -f rbac.yaml
+        kubectl apply -f network-policy.yaml
+        kubectl apply -f deployment.yaml
